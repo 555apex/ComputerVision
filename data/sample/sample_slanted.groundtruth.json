@@ -1,0 +1,82 @@
+{
+  "generator": "generate_sample.py",
+  "note": "Exact ground truth for the synthetic sample. `homography_source_to_destination` maps the slanted image to the true document rectangle; it is the reference used by the ground-truth metrics in summary.csv.",
+  "document_size": {
+    "width": 640,
+    "height": 420
+  },
+  "source_size": {
+    "width": 920,
+    "height": 700
+  },
+  "source_corners_tl_tr_br_bl": [
+    [
+      155.0,
+      95.0
+    ],
+    [
+      765.0,
+      70.0
+    ],
+    [
+      835.0,
+      590.0
+    ],
+    [
+      85.0,
+      625.0
+    ]
+  ],
+  "destination_corners_tl_tr_br_bl": [
+    [
+      0.0,
+      0.0
+    ],
+    [
+      639.0,
+      0.0
+    ],
+    [
+      639.0,
+      419.0
+    ],
+    [
+      0.0,
+      419.0
+    ]
+  ],
+  "homography_source_to_destination": [
+    [
+      190.22409979259655,
+      25.12393770854425,
+      -31871.509550161474
+    ],
+    [
+      7.287394845206556,
+      177.812434217602,
+      -18021.727451660143
+    ],
+    [
+      0.0012851139920304984,
+      0.07921828411600879,
+      174.07974942577096
+    ]
+  ],
+  "homography_document_to_source": [
+    [
+      0.005294407099355892,
+      -0.0011279017579147268,
+      0.8525633156397747
+    ],
+    [
+      -0.00021120403657029287,
+      0.005420946255396107,
+      0.5225388063592722
+    ],
+    [
+      5.7027338132851546e-08,
+      -2.4585776330597752e-06,
+      0.005500408487998545
+    ]
+  ]
+}

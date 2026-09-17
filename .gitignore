@@ -1,0 +1,39 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+pip-*/
+
+# 虚拟环境不进版本库（换机后重建即可）
+.venv/
+venv/
+.idea/
+
+# 实验产物不提交（可重复生成）
+outputs/*
+data/sample/*.png
+
+# 数据集图片不提交（体积大、有独立授权）
+# 换机后用 fetch_public_samples.py 重新拉取；自行拍摄的照片请单独备份
+data/public/*
+data/phone/*
+!data/**/.gitkeep
+
+# 但这些纯文本的记录必须提交，否则换机后溯源信息就丢了
+!data/public/SOURCES.md
+!data/public/corners/
+!data/public/corners/*.json
+
+# 实验报告正文引用了这些配图，必须提交，否则报告在仓库里显示为断图
+!outputs/figures/
+outputs/figures/*
+!outputs/figures/*.png
+
+# 个人学习资料不推送（学习计划、操作复现指南、审计与优化计划）
+学习计划.md
+PyCharm操作复现指南.md
+终端操作复现指南.md
+优化计划书.md
+.audit/
+
+# 本地工作区数据（记忆/上下文），与项目本身无关
+.workbuddy/
