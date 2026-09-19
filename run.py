@@ -47,10 +47,12 @@ from homography import (
     reprojection_errors,
     solve_homography,
 )
+
 from io_utils import (
     format_number,
     iter_images,
     load_ground_truth,
+    read_image,
     require_opencv,
     save_image,
     save_json,
@@ -58,6 +60,8 @@ from io_utils import (
 )
 from point_picker import select_four_corners
 from validation import validate_corners
+
+PROJECT_ROOT = Path(__file__).resolve().parent
 from warping import inverse_warp_bilinear, opencv_warp
 
 SOLVE_REPEATS = 20
@@ -122,6 +126,37 @@ def _source_label(path: Path, input_root: Path | None) -> str:
     return "single"
 
 
+def _project_relative(path: Path) -> str:
+    """Path relative to the project root when possible, so metadata is portable."""
+
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return path.name
+
+
+def _batch_points_file(image_path: Path, input_root: Path, points_dir: Path | None) -> Path | None:
+    """Corner file for a batch item, or ``None`` when there is none.
+
+    With ``--points-dir`` the file must be ``<points-dir>/<image stem>.json``.
+    Otherwise two conventions are probed, in order: ``corners/`` next to the image
+    (how ``data/public/`` and ``data/phone/`` are laid out) and ``corners/`` at the
+    input root.  Returning ``None`` means "no fixed corners available"; the caller
+    decides whether to fall back to the interactive picker.
+    """
+
+    if points_dir is not None:
+        candidate = points_dir / f"{image_path.stem}.json"
+        return candidate if candidate.is_file() else None
+    for candidate in (
+        image_path.parent / "corners" / f"{image_path.stem}.json",
+        input_root / "corners" / f"{image_path.stem}.json",
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _resolve_output_size(
     source_points: np.ndarray,
     ground_truth: dict | None,
@@ -165,12 +200,19 @@ def process_image(
     output_size: tuple[int, int] | None = None,
     warp_repeats: int = DEFAULT_WARP_REPEATS,
     use_ground_truth: bool = True,
+    allow_interactive: bool = True,
 ) -> list[dict]:
     cv2 = require_opencv()
-    image = cv2.imread(str(path), cv2.IMREAD_COLOR)
-    if image is None:
-        raise ValueError(f"OpenCV could not read image: {path}")
-    source_points = fixed_points if fixed_points is not None else select_four_corners(image)
+    image = read_image(path)
+    if fixed_points is not None:
+        source_points = fixed_points
+    elif allow_interactive:
+        source_points = select_four_corners(image)
+    else:
+        raise ValueError(
+            "no corners supplied and the picker is disabled; pass --points-file, "
+            "--points-from-ground-truth, or drop --no-interactive"
+        )
     valid, message = validate_corners(source_points)
     if not valid:
         raise ValueError(message)
@@ -184,8 +226,9 @@ def process_image(
     truth_size = _truth_document_size(ground_truth)
     # Held-out evaluation points: a bilinear grid inside the source quad.  Using the
     # fitted corners themselves would make the comparison degenerate (a four-point
-    # fit reproduces its own inputs exactly).
-    evaluation_points = quad_grid(source_points, steps=25)
+    # fit reproduces its own inputs exactly).  The grid size comes from quad_grid's
+    # default so that these numbers and gt_experiment.py's are directly comparable.
+    evaluation_points = quad_grid(source_points)
 
     width, height, size_source = _resolve_output_size(source_points, ground_truth, output_size)
     target_points = destination_corners(width, height)
@@ -273,7 +316,9 @@ def process_image(
 
     aspect_error = _aspect_error_percent(width, height, truth_size)
     metadata = {
-        "input": str(path.resolve()),
+        # Recorded relative to the project root so the metadata stays portable:
+        # an absolute path would embed whoever ran it.
+        "input": _project_relative(path),
         "source": _source_label(path, input_root),
         "input_resolution": {"width": int(image.shape[1]), "height": int(image.shape[0])},
         "output_resolution": {"width": width, "height": height},
@@ -284,7 +329,7 @@ def process_image(
         "ground_truth": {
             "available": ground_truth is not None,
             "document_size": None if truth_size is None else {"width": truth_size[0], "height": truth_size[1]},
-            "sidecar": str(path.with_suffix(".groundtruth.json")) if ground_truth is not None else None,
+            "sidecar": _project_relative(path.with_suffix(".groundtruth.json")) if ground_truth is not None else None,
         },
         "timing": {
             "solve_repeats": SOLVE_REPEATS,
@@ -376,6 +421,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
     parser.add_argument("--points-file", type=Path, help="JSON file containing four corners for single-image non-interactive runs")
     parser.add_argument(
+        "--points-dir", type=Path,
+        help=("directory of <image stem>.json corner files for batch runs, overriding the "
+              "default probe of <image dir>/corners/ and <input-dir>/corners/."),
+    )
+    parser.add_argument(
+        "--no-interactive", action="store_true",
+        help=("never open the corner picker. Batch items without a corner file are skipped "
+              "with a message, which is what makes a batch run reproducible end to end."),
+    )
+    parser.add_argument(
+        "--overwrite-summary", action="store_true",
+        help=("replace summary.csv instead of merging into it. By default rows already in the file "
+              "are kept unless this run produces the same (image, method, target rectangle)."),
+    )
+    parser.add_argument(
         "--output-size", nargs=2, type=int, metavar=("WIDTH", "HEIGHT"),
         help=("fix the target rectangle instead of estimating it, e.g. `--output-size 640 420`. "
               "Four point correspondences determine the mapping only relative to the target rectangle, "
@@ -421,6 +481,7 @@ def main() -> int:
             fixed_points=fixed_points,
             output_size=output_size,
             warp_repeats=args.warp_repeats,
+            allow_interactive=not args.no_interactive,
             use_ground_truth=not args.ignore_ground_truth,
         ))
     else:
@@ -428,13 +489,32 @@ def main() -> int:
         if not images:
             raise SystemExit(f"no supported images found under {args.input_dir}")
         skipped = 0
+        reused = 0
         for image_path in images:
+            points_file = _batch_points_file(image_path, args.input_dir, args.points_dir)
+            if points_file is not None:
+                try:
+                    batch_points = _parse_points(points_file)
+                except ValueError as exc:
+                    skipped += 1
+                    print(f"SKIP {image_path.name}: {exc}")
+                    continue
+                reused += 1
+            elif args.points_dir is not None or args.no_interactive:
+                skipped += 1
+                print(f"SKIP {image_path.name}: no corner file found for it")
+                continue
+            else:
+                # No corner file anywhere: fall back to the interactive picker.
+                batch_points = None
             try:
                 rows.extend(process_image(
                     image_path, args.output_dir,
                     input_root=args.input_dir,
+                    fixed_points=batch_points,
                     output_size=output_size,
                     warp_repeats=args.warp_repeats,
+                    allow_interactive=not args.no_interactive,
                     use_ground_truth=not args.ignore_ground_truth,
                 ))
             except KeyboardInterrupt:
@@ -442,10 +522,14 @@ def main() -> int:
             except Exception as exc:
                 skipped += 1
                 print(f"SKIP {image_path}: {exc}")
+        print(f"batch: {reused} image(s) used a corner file, {len(images) - skipped} processed, {skipped} skipped")
         if skipped:
             print(f"WARNING: skipped {skipped} of {len(images)} image(s)")
-    save_summary(args.output_dir / "summary.csv", rows)
-    print(f"Saved {len(rows)} method rows to {args.output_dir / 'summary.csv'}")
+    total = save_summary(
+        args.output_dir / "summary.csv", rows,
+        merge_existing=not args.overwrite_summary,
+    )
+    print(f"summary.csv now holds {total} method row(s) ({len(rows)} from this run)")
     return 0
 
 

@@ -14,6 +14,11 @@ import numpy as np
 
 Array = np.ndarray
 
+# H has eight degrees of freedom, so the DLT matrix needs at least eight independent
+# rows. Below that the null space is more than one-dimensional and the "solution" is
+# arbitrary within it.
+MIN_DLT_RANK = 8
+
 
 def _as_points(points: Iterable[Iterable[float]], name: str) -> Array:
     result = np.asarray(points, dtype=np.float64)
@@ -75,6 +80,63 @@ def _canonicalize_homography(matrix: Array) -> Array:
     return result
 
 
+def require_solvable(
+    src: Array,
+    dst: Array,
+    matrix: Array,
+    *,
+    already_normalized: bool,
+) -> None:
+    """Reject correspondences that cannot yield a usable H, and say which reason.
+
+    Two unrelated things can go wrong and they need different fixes, so they are
+    diagnosed separately instead of collapsing into one "degenerate" message.
+
+    *Geometric.*  Whether a solution exists at all is a property of the point
+    configuration, not of the units.  In Hartley-normalized coordinates the DLT
+    matrix is scale-free, so a rank deficiency there means at least three of the
+    points are collinear or two are coincident, and no rescaling will help.  This is
+    checked first: a collinear configuration would also fail the numerical test
+    below, and "you picked collinear points" is the more useful diagnosis.
+
+    *Numerical.*  The matrix actually handed to the SVD must still have rank 8.
+    Eight independent equations are the minimum for the eight degrees of freedom of
+    H; once the rank drops to 7 the null space is no longer one-dimensional and
+    ``vh[-1]`` stops being the solution.  Real coordinates do reach this -- with
+    pixel coordinates around 1e4 the columns of A span about thirty orders of
+    magnitude and the rank collapses, even though the geometry is fine.  This test
+    is therefore unit-dependent by design: its tolerance comes from
+    ``np.linalg.matrix_rank``, which scales with the largest singular value.
+    """
+
+    if already_normalized:
+        normalized_matrix = matrix
+    else:
+        src_normalized, _ = normalize_points(src)
+        dst_normalized, _ = normalize_points(dst)
+        normalized_matrix = build_dlt_matrix(src_normalized, dst_normalized)
+
+    geometric_rank = int(np.linalg.matrix_rank(normalized_matrix))
+    if geometric_rank < MIN_DLT_RANK:
+        raise ValueError(
+            f"the point configuration is degenerate: the normalized DLT matrix has rank "
+            f"{geometric_rank} < {MIN_DLT_RANK}, so at least three of the points are "
+            "collinear or two are coincident. Rescaling cannot fix this."
+        )
+
+    if already_normalized:
+        return
+
+    rank = int(np.linalg.matrix_rank(matrix))
+    if rank < MIN_DLT_RANK:
+        raise ValueError(
+            f"the DLT system is numerically rank-deficient: rank {rank} < {MIN_DLT_RANK}, "
+            "although the point configuration itself is fine. This happens when the "
+            "coordinate magnitudes make A ill-conditioned; rescale the input or solve "
+            "with normalize=True."
+        )
+
+
 def solve_homography(
     src_points: Iterable[Iterable[float]],
     dst_points: Iterable[Iterable[float]],
@@ -102,10 +164,14 @@ def solve_homography(
         dst_transform = np.eye(3, dtype=np.float64)
         matrix = build_dlt_matrix(src, dst)
 
-    rank = np.linalg.matrix_rank(matrix)
-    if rank < 8:
-        raise ValueError(f"correspondences are degenerate: DLT matrix rank is {rank}, expected at least 8")
+    require_solvable(src, dst, matrix, already_normalized=normalize)
 
+    # full_matrices=True is written out on purpose: the DLT matrix is 8x9, so the
+    # ninth (exactly zero) singular value only exists in the full 9x9 V, and vh[-1]
+    # is the null-space solution only then.  It also happens to be NumPy's default,
+    # so removing the argument changes nothing -- but setting it to False truncates
+    # V to 8x9 and vh[-1] silently becomes the wrong vector (reprojection RMSE jumps
+    # from 2e-09 px to 607 px with no error raised).
     _, singular_values, vh = np.linalg.svd(matrix, full_matrices=True)
     normalized_h = vh[-1].reshape(3, 3)
     homography = np.linalg.inv(dst_transform) @ normalized_h @ src_transform
@@ -154,12 +220,17 @@ def aligned_matrix_error(estimated: Array, reference: Array) -> float:
     return float(np.linalg.norm(scale * estimate - reference))
 
 
-def quad_grid(corners: Iterable[Iterable[float]], steps: int = 25) -> Array:
+def quad_grid(corners: Iterable[Iterable[float]], steps: int = 31) -> Array:
     """Bilinear grid of points inside a quad ordered TL, TR, BR, BL.
 
     Used as held-out evaluation points: they are *not* the correspondences the
     homography was fitted from, so comparing two homographies on them is free of
     the "fit residual is identically zero" degeneracy.
+
+    The default ``steps`` is shared by ``run.py`` and ``gt_experiment.py`` on purpose.
+    When the two used different grids (25 versus 31) the same measurement came out as
+    95.51 and 95.35 px for the same configuration, which reads as a contradiction in
+    the report unless the grid size is spelled out every time.
     """
 
     pts = np.asarray(corners, dtype=np.float64)

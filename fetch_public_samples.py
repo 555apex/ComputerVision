@@ -30,6 +30,8 @@ import zipfile
 from pathlib import Path
 
 import cv2
+
+from io_utils import save_image
 import numpy as np
 
 USER_AGENT = "ComputerVision-coursework/1.0 (educational use; homography assignment)"
@@ -62,8 +64,7 @@ def writable_image(path: Path, image: np.ndarray, max_side: int) -> tuple[int, i
             (int(round(width * scale)), int(round(height * scale))),
             interpolation=cv2.INTER_AREA,
         )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), image, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+    save_image(path, image)
     return image.shape[1], image.shape[0], image.shape[1] * image.shape[0]
 
 

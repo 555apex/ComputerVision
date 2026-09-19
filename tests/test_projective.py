@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from educational_svd import jacobi_svd
 from homography import (
@@ -55,3 +56,63 @@ def test_jacobi_svd_has_correct_smallest_right_vector():
     _, singular_values, v_t = jacobi_svd(matrix)
     assert np.all(np.diff(singular_values) <= 1e-10)
     assert abs(np.linalg.norm(matrix @ v_t[-1])) < 1e-8
+
+
+DEGENERATE_QUADS = [
+    ("all four points on one line", [[0, 0], [10, 0], [20, 0], [30, 0]]),
+    ("three collinear points", [[0, 0], [10, 0], [20, 0], [0, 10]]),
+    ("two coincident points", [[0, 0], [0, 0], [20, 20], [0, 10]]),
+]
+
+
+@pytest.mark.parametrize("label, quad", DEGENERATE_QUADS, ids=[case[0] for case in DEGENERATE_QUADS])
+def test_degenerate_quad_is_diagnosed_as_a_geometric_problem(label, quad):
+    """A broken point configuration must be reported as such, not as bad luck.
+
+    The message matters: "your three points are collinear" points at the fix,
+    whereas a generic "degenerate" error sends the reader off to rescale coordinates.
+    """
+
+    points = np.asarray(quad, dtype=float)
+    with pytest.raises(ValueError) as error:
+        solve_homography(points, points)
+    assert "configuration is degenerate" in str(error.value)
+    assert "collinear" in str(error.value)
+
+
+@pytest.mark.parametrize("scale", [1e-3, 1.0, 1e3, 1e5])
+def test_geometric_diagnosis_is_independent_of_coordinate_scale(scale):
+    """The same broken configuration, expressed in different units, is still broken."""
+
+    quad = np.asarray([[0, 0], [10, 0], [20, 0], [0, 10]], dtype=float) * scale
+    with pytest.raises(ValueError) as error:
+        solve_homography(quad, quad)
+    assert "configuration is degenerate" in str(error.value)
+
+
+def test_large_coordinates_are_diagnosed_as_numerical_and_normalization_fixes_them():
+    """Well-formed geometry, unworkable units.
+
+    The point set is a plain rectangle scaled up by 1e5. The unnormalized solve has
+    to refuse (the columns of A span about thirty orders of magnitude), and the
+    message has to point at normalization, because that is what actually works --
+    which the second half of the test demonstrates.
+    """
+
+    base = np.array([[100.0, 100.0], [900.0, 100.0], [900.0, 600.0], [100.0, 600.0]])
+    reference = np.array([[1.02, -0.13, 40.0], [0.07, 1.05, 25.0], [3.0e-4, -2.0e-4, 1.0]])
+    scale = 1e5
+    scaling = np.diag([scale, scale, 1.0])
+    source = base * scale
+    target = project_points(scaling @ reference @ np.linalg.inv(scaling), source)
+
+    with pytest.raises(ValueError) as error:
+        solve_homography(source, target, normalize=False)
+    message = str(error.value)
+    assert "numerically rank-deficient" in message
+    assert "configuration itself is fine" in message
+
+    recovered, _, _ = solve_homography(source, target, normalize=True)
+    # The recovered mapping must still send the source quad onto the target quad.
+    assert np.max(reprojection_errors(recovered, source, target)) < 1e-3
+

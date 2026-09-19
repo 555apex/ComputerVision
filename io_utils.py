@@ -5,12 +5,22 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+
+# Identity of a summary row: the same image, from the same source, solved by the same
+# method for the same target rectangle.  ``source`` has to be part of the key because
+# ``image`` is only a file name -- data/public and data/phone can both contain a
+# ``fig1.jpg``, and without the source the later run would silently replace the
+# earlier one.  Two runs at different target sizes are different rows, which is what
+# keeps both variants of the aspect-ratio experiment on record.
+SUMMARY_KEY_FIELDS = (
+    "source", "image", "method", "target_size_source", "output_width", "output_height",
+)
 
 SUMMARY_FIELDS = [
     "image",
@@ -43,14 +53,56 @@ def require_opencv():
 
 
 def iter_images(root: Path) -> list[Path]:
-    return sorted(path for path in root.rglob("*") if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES)
+    """Image files under ``root``, skipping the corner sidecar directories.
+
+    ``corners/`` holds the four-corner JSON files, which describe images rather than
+    being images themselves.  A stray preview picture dropped in there must not be
+    picked up as an input.
+    """
+
+    return sorted(
+        path for path in root.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in IMAGE_SUFFIXES
+        and "corners" not in path.parts
+    )
+
+
+def read_image(path: Path, flags: int | None = None) -> np.ndarray:
+    """Read an image through numpy instead of ``cv2.imread``.
+
+    ``cv2.imread`` goes through the C runtime's narrow-character file API, so it
+    fails on any path that the active code page cannot represent -- every Chinese
+    filename on a Windows machine, for instance.  ``np.fromfile`` uses the Python
+    filesystem encoding and ``cv2.imdecode`` then decodes the bytes, which works
+    regardless of the path.
+    """
+
+    cv2 = require_opencv()
+    if flags is None:
+        flags = cv2.IMREAD_COLOR
+    buffer = np.fromfile(str(path), dtype=np.uint8)
+    if buffer.size == 0:
+        raise ValueError(f"file is empty or unreadable: {path}")
+    image = cv2.imdecode(buffer, flags)
+    if image is None:
+        raise ValueError(f"OpenCV could not decode image: {path}")
+    return image
 
 
 def save_image(path: Path, image: np.ndarray) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Write an image through numpy for the same reason as :func:`read_image`."""
+
     cv2 = require_opencv()
-    if not cv2.imwrite(str(path), image):
-        raise IOError(f"OpenCV could not write image: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    suffix = path.suffix.lower() or ".png"
+    parameters: list[int] = []
+    if suffix in (".jpg", ".jpeg"):
+        parameters = [int(cv2.IMWRITE_JPEG_QUALITY), 95]
+    ok, buffer = cv2.imencode(suffix, image, parameters)
+    if not ok:
+        raise IOError(f"OpenCV could not encode image: {path}")
+    buffer.tofile(str(path))
 
 
 def save_json(path: Path, payload: dict) -> None:
@@ -77,19 +129,44 @@ def load_ground_truth(image_path: Path) -> dict | None:
     return payload
 
 
-def save_summary(path: Path, rows: Iterable[dict]) -> None:
+def load_summary_rows(path: Path) -> list[dict]:
+    """Read an existing summary CSV back into dicts (empty list if absent)."""
+
+    if not path.is_file():
+        return []
+    with path.open("r", newline="", encoding="utf-8-sig") as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
+
+
+def save_summary(
+    path: Path,
+    rows: Iterable[dict],
+    *,
+    merge_existing: bool = False,
+    key_fields: Sequence[str] = SUMMARY_KEY_FIELDS,
+) -> int:
     """Write rows to CSV, using the union of all keys as the header.
 
-    Note this *overwrites* the file rather than appending.  Mixing a single-image
-    run with a later batch run therefore discards the earlier rows -- copy the
-    file aside first if you need to keep them.
+    With ``merge_existing=True`` the rows already in the file are kept, except for
+    those whose ``key_fields`` tuple is produced again by this run -- that is how a
+    single-image run and a later batch run can coexist, and how two runs of the
+    same image at *different* target rectangles both stay on record.  Without it
+    the file is replaced, which is the old behaviour and loses earlier rows.
     """
 
     rows = list(rows)
+    if merge_existing:
+        superseded = {tuple(str(row.get(field, "")) for field in key_fields) for row in rows}
+        kept = [
+            previous for previous in load_summary_rows(path)
+            if tuple(str(previous.get(field, "")) for field in key_fields) not in superseded
+        ]
+        rows = kept + rows
+
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
         path.write_text("", encoding="utf-8")
-        return
+        return 0
 
     fields: list[str] = []
     for row in rows:
@@ -100,6 +177,7 @@ def save_summary(path: Path, rows: Iterable[dict]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
+    return len(rows)
 
 
 def format_number(value: object, digits: int = 4) -> str:

@@ -447,7 +447,11 @@ def _read_rgb(path: Path) -> np.ndarray:
     try:
         import cv2
 
-        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        # np.fromfile + imdecode rather than cv2.imread: result folders are named
+        # after their source image, so a Chinese filename would not be readable
+        # through imread on Windows.
+        buffer = np.fromfile(str(path), dtype=np.uint8)
+        image = cv2.imdecode(buffer, cv2.IMREAD_COLOR) if buffer.size else None
         if image is not None:
             return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     except ImportError:
@@ -479,8 +483,21 @@ def plot_result_grid(output_root: Path, output_path: Path) -> bool:
     return True
 
 
+def _configuration_label(row: dict) -> str:
+    """Human label for the target-rectangle configuration a summary row belongs to.
+
+    Rows from different configurations must never be averaged together: solving the
+    same image against a 751x535 and against a 640x420 rectangle gives two very
+    different geometries, and averaging them produces a number that describes neither.
+    """
+
+    kind = (row.get("target_size_source") or "").strip()
+    name = {"cli": "fixed", "estimated": "auto-estimated", "ground_truth": "ground truth"}.get(kind, kind or "unknown")
+    return f"{name} {row.get('output_width', '?')}x{row.get('output_height', '?')}"
+
+
 def plot_summary(summary_path: Path, output_path: Path) -> bool:
-    """Bar chart of per-method error on real images.
+    """Bar chart of per-method error, grouped by target-rectangle configuration.
 
     Prefers the ground-truth metric ``transfer_rmse_vs_truth_px``.  Falls back to
     implementation agreement, and only last to the fit residual -- which is
@@ -497,40 +514,72 @@ def plot_summary(summary_path: Path, output_path: Path) -> bool:
         "image_mae_vs_opencv": "Mean |image - OpenCV| (gray levels) - implementation agreement",
         "fit_residual_rmse_px": "Fit residual (pixel) - DEGENERATE for n=4, no ground truth",
     }
-    grouped: dict[str, list[float]] = defaultdict(list)
-    used = ""
     with summary_path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
+
+    used = ""
+    by_config: dict[str, dict[str, list[float]]] = {}
     for metric in metric_labels:
-        candidate: dict[str, list[float]] = defaultdict(list)
+        collected: dict[str, dict[str, list[float]]] = {}
         for row in rows:
             value = row.get(metric, "")
-            if value:
-                candidate[row["method"]].append(float(value))
-        if candidate:
-            grouped, used = candidate, metric
+            if not value:
+                continue
+            collected.setdefault(_configuration_label(row), defaultdict(list))[row["method"]].append(float(value))
+        if collected:
+            by_config, used = collected, metric
             break
-    if not grouped:
+    if not by_config:
         return False
 
-    methods = list(grouped)
-    means = [np.mean(grouped[method]) for method in methods]
-    stds = [np.std(grouped[method]) for method in methods]
+    methods = [method for method in ("basic_dlt", "normalized_dlt", "opencv")
+               if any(method in group for group in by_config.values())]
+    configurations = sorted(by_config)
     label = metric_labels[used]
-    title = ("Real-image Rectification Error" if used == "transfer_rmse_vs_truth_px"
-             else "Real-image Comparison")
-    figure, axis = plt.subplots(figsize=(9, 5.5), constrained_layout=True)
-    bars = axis.bar(methods, means, yerr=stds, capsize=5,
-                    color=[METHOD_COLORS.get(method, "#999999") for method in methods], alpha=0.9)
-    axis.set_title(title, fontsize=16, fontweight="bold")
-    axis.set_ylabel(label)
+    spread = [value for group in by_config.values() for values in group.values() for value in values]
+    positive = [value for value in spread if value > 0]
+    use_log = bool(positive) and max(positive) / min(positive) > 1e3
+
+    figure, axis = plt.subplots(figsize=(9.5, 5.5), constrained_layout=True)
+    if len(configurations) == 1:
+        group = by_config[configurations[0]]
+        means = [float(np.mean(group.get(method, [np.nan]))) for method in methods]
+        stds = [float(np.std(group.get(method, [np.nan]))) for method in methods]
+        bars = axis.bar(methods, means, yerr=stds, capsize=5,
+                        color=[METHOD_COLORS.get(method, "#999999") for method in methods], alpha=0.9)
+        for bar, mean in zip(bars, means):
+            axis.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{mean:.3g}", ha="center", va="bottom")
+        title = ("Real-image Rectification Error" if used == "transfer_rmse_vs_truth_px"
+                 else "Real-image Comparison")
+    else:
+        palette = ["#4c78a8", "#f58518", "#54a24b", "#b279a2"]
+        width = 0.8 / len(configurations)
+        offsets = (np.arange(len(configurations)) - (len(configurations) - 1) / 2) * width
+        positions = np.arange(len(methods))
+        for index, configuration in enumerate(configurations):
+            group = by_config[configuration]
+            means = [float(np.mean(group.get(method, [np.nan]))) for method in methods]
+            counts = max((len(group.get(method, [])) for method in methods), default=0)
+            axis.bar(positions + offsets[index], means, width,
+                     color=palette[index % len(palette)], alpha=0.9, edgecolor="none",
+                     label=f"{configuration}  (n={counts})")
+        axis.set_xticks(positions, methods)
+        axis.legend(title="Target rectangle", fontsize=9, title_fontsize=9,
+                    loc="upper left", bbox_to_anchor=(1.01, 1.0), frameon=False)
+        title = ("Real-image Error by Target Rectangle" if used == "transfer_rmse_vs_truth_px"
+                 else "Real-image Comparison")
+    if use_log and len(configurations) > 1:
+        axis.set_yscale("log")
+        axis.set_ylabel(label + "  [log scale]")
+    else:
+        axis.set_ylabel(label)
+
+    axis.set_title(title, fontsize=15, fontweight="bold")
     axis.set_xlabel("Method")
     axis.grid(axis="y", alpha=0.3)
-    for bar, mean in zip(bars, means):
-        axis.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{mean:.3g}", ha="center", va="bottom")
     figure.savefig(output_path, dpi=220, bbox_inches="tight")
     plt.close(figure)
-    print(f"  (error bar chart uses: {used})")
+    print(f"  (error bar chart uses: {used}; {len(configurations)} target-rectangle configuration(s))")
     return True
 
 

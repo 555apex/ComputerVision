@@ -58,7 +58,7 @@ from homography import (
     quad_grid,
     solve_homography,
 )
-from io_utils import require_opencv, save_json
+from io_utils import read_image, require_opencv, save_json
 from warping import inverse_warp_bilinear, opencv_warp
 
 SAMPLE_IMAGE = Path("data/sample/sample_slanted.png")
@@ -208,7 +208,7 @@ def part_c_jitter_sweep(
 def make_figure(truth: dict, part_b: dict, sweep: list[dict], path: Path) -> None:
     true_size = (int(truth["document_size"]["width"]), int(truth["document_size"]["height"]))
     document = make_document(*true_size)
-    image = require_opencv().imread(str(SAMPLE_IMAGE), require_opencv().IMREAD_COLOR)
+    image = read_image(SAMPLE_IMAGE)
     corners = np.asarray(truth["source_corners_tl_tr_br_bl"], dtype=np.float64)
 
     renders: dict[str, np.ndarray] = {}
@@ -334,10 +334,10 @@ def main() -> int:
     args = parser.parse_args()
 
     truth = load_truth()
-    cv2 = require_opencv()
-    image = cv2.imread(str(SAMPLE_IMAGE), cv2.IMREAD_COLOR)
-    if image is None:
-        raise SystemExit(f"could not read {SAMPLE_IMAGE}; run `python generate_sample.py` first")
+    try:
+        image = read_image(SAMPLE_IMAGE)
+    except ValueError as exc:
+        raise SystemExit(f"could not read {SAMPLE_IMAGE} ({exc}); run `python generate_sample.py` first") from exc
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
