@@ -23,16 +23,20 @@ data/phone/*
 !data/public/corners/
 !data/public/corners/*.json
 
+# 角点文件同样提交：图片不进库，但角点是人工标定的结果，
+# 有了它 --batch --no-interactive 才能重跑（照片放回原目录即可对上）
+!data/phone/corners/
+!data/phone/corners/*.json
+
 # 实验报告正文引用了这些配图，必须提交，否则报告在仓库里显示为断图
 !outputs/figures/
 outputs/figures/*
 !outputs/figures/*.png
 
-# 个人学习资料不推送（学习计划、操作复现指南、审计与优化计划）
+# 个人学习资料不推送（学习计划、操作复现指南、审计脚本）
 学习计划.md
 PyCharm操作复现指南.md
 终端操作复现指南.md
-优化计划书.md
 .audit/
 
 # 本地工作区数据（记忆/上下文），与项目本身无关

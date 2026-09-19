@@ -1,0 +1,322 @@
+{
+  "part_a": {
+    "target_size": "640x420",
+    "methods": {
+      "basic_dlt": {
+        "matrix_error_vs_truth": 2.9631616395810486e-08,
+        "target_mismatch_rmse_px": 2.026675118536959e-09,
+        "target_mismatch_max_px": 3.120493506991372e-09,
+        "transfer_rmse_vs_truth_px": 2.55008264720476e-09,
+        "transfer_max_vs_truth_px": 6.687226931356627e-09,
+        "transfer_eval_count": 961.0
+      },
+      "normalized_dlt": {
+        "matrix_error_vs_truth": 1.2587643827298941e-08,
+        "target_mismatch_rmse_px": 1.4573328374199865e-13,
+        "target_mismatch_max_px": 2.0781825805219832e-13,
+        "transfer_rmse_vs_truth_px": 1.713518129314628e-09,
+        "transfer_max_vs_truth_px": 5.067577647873438e-09,
+        "transfer_eval_count": 961.0
+      }
+    }
+  },
+  "part_b": {
+    "cases": [
+      {
+        "case": "auto_estimated",
+        "target_size": "751x535",
+        "aspect_error_percent": 7.879672897196259,
+        "stretch_percent": 8.55367446579165,
+        "full_mae_vs_document": 1.892890625,
+        "interior_mae_vs_document": 1.4337883646358223,
+        "methods": {
+          "basic_dlt": {
+            "matrix_error_vs_truth": 1318.732918436573,
+            "target_mismatch_rmse_px": 113.01769772410802,
+            "target_mismatch_max_px": 159.83116090743917,
+            "transfer_rmse_vs_truth_px": 95.34831207793151,
+            "transfer_max_vs_truth_px": 159.83116090797844,
+            "transfer_eval_count": 961.0
+          },
+          "normalized_dlt": {
+            "matrix_error_vs_truth": 1318.7329184085775,
+            "target_mismatch_rmse_px": 113.01769772916116,
+            "target_mismatch_max_px": 159.83116091676266,
+            "transfer_rmse_vs_truth_px": 95.34831208091406,
+            "transfer_max_vs_truth_px": 159.83116091730196,
+            "transfer_eval_count": 961.0
+          }
+        }
+      },
+      {
+        "case": "true_size",
+        "target_size": "640x420",
+        "aspect_error_percent": 0.0,
+        "stretch_percent": 0.0,
+        "full_mae_vs_document": 1.4323201884920636,
+        "interior_mae_vs_document": 0.9399129638112689,
+        "methods": {
+          "basic_dlt": {
+            "matrix_error_vs_truth": 2.9631616395810486e-08,
+            "target_mismatch_rmse_px": 2.026675118536959e-09,
+            "target_mismatch_max_px": 3.120493506991372e-09,
+            "transfer_rmse_vs_truth_px": 2.55008264720476e-09,
+            "transfer_max_vs_truth_px": 6.687226931356627e-09,
+            "transfer_eval_count": 961.0
+          },
+          "normalized_dlt": {
+            "matrix_error_vs_truth": 1.2587643827298941e-08,
+            "target_mismatch_rmse_px": 1.4573328374199865e-13,
+            "target_mismatch_max_px": 2.0781825805219832e-13,
+            "transfer_rmse_vs_truth_px": 1.713518129314628e-09,
+            "transfer_max_vs_truth_px": 5.067577647873438e-09,
+            "transfer_eval_count": 961.0
+          }
+        }
+      }
+    ],
+    "true_size": "640x420"
+  },
+  "part_c": [
+    {
+      "sigma_px": 0.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.3483120779315,
+      "transfer_median_vs_truth_px": 95.34831207793151,
+      "transfer_std_vs_truth_px": 1.4282446375932695e-14
+    },
+    {
+      "sigma_px": 0.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.34831208091406,
+      "transfer_median_vs_truth_px": 95.34831208091406,
+      "transfer_std_vs_truth_px": 0.0
+    },
+    {
+      "sigma_px": 0.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 2.550082647204759e-09,
+      "transfer_median_vs_truth_px": 2.55008264720476e-09,
+      "transfer_std_vs_truth_px": 8.313477956650717e-25
+    },
+    {
+      "sigma_px": 0.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 1.7135181293146275e-09,
+      "transfer_median_vs_truth_px": 1.713518129314628e-09,
+      "transfer_std_vs_truth_px": 4.156738978325359e-25
+    },
+    {
+      "sigma_px": 0.5,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.36560179329547,
+      "transfer_median_vs_truth_px": 95.40319538314111,
+      "transfer_std_vs_truth_px": 0.3260120319633941
+    },
+    {
+      "sigma_px": 0.5,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.3656017935842,
+      "transfer_median_vs_truth_px": 95.40319538150669,
+      "transfer_std_vs_truth_px": 0.32601203178778493
+    },
+    {
+      "sigma_px": 0.5,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 0.4825384149746418,
+      "transfer_median_vs_truth_px": 0.46286326812544387,
+      "transfer_std_vs_truth_px": 0.1710239183066336
+    },
+    {
+      "sigma_px": 0.5,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 0.48253841487342425,
+      "transfer_median_vs_truth_px": 0.46286326891572827,
+      "transfer_std_vs_truth_px": 0.1710239182589567
+    },
+    {
+      "sigma_px": 1.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.38583891480255,
+      "transfer_median_vs_truth_px": 95.46203821121317,
+      "transfer_std_vs_truth_px": 0.6523214026730104
+    },
+    {
+      "sigma_px": 1.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.3858389152567,
+      "transfer_median_vs_truth_px": 95.46203821250276,
+      "transfer_std_vs_truth_px": 0.6523214026428256
+    },
+    {
+      "sigma_px": 1.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 0.9652238949287023,
+      "transfer_median_vs_truth_px": 0.9257253067791811,
+      "transfer_std_vs_truth_px": 0.34217068694662217
+    },
+    {
+      "sigma_px": 1.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 0.9652238950632972,
+      "transfer_median_vs_truth_px": 0.9257253066478779,
+      "transfer_std_vs_truth_px": 0.3421706868860656
+    },
+    {
+      "sigma_px": 2.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.43515454522723,
+      "transfer_median_vs_truth_px": 95.59146322458588,
+      "transfer_std_vs_truth_px": 1.3057692914565449
+    },
+    {
+      "sigma_px": 2.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.43515454564381,
+      "transfer_median_vs_truth_px": 95.59146322614328,
+      "transfer_std_vs_truth_px": 1.305769291788358
+    },
+    {
+      "sigma_px": 2.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 1.9310779579239554,
+      "transfer_median_vs_truth_px": 1.8515000860203559,
+      "transfer_std_vs_truth_px": 0.684860900682011
+    },
+    {
+      "sigma_px": 2.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 1.9310779580190185,
+      "transfer_median_vs_truth_px": 1.851500086176362,
+      "transfer_std_vs_truth_px": 0.6848609007649368
+    },
+    {
+      "sigma_px": 3.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.4962607713781,
+      "transfer_median_vs_truth_px": 95.73630731810927,
+      "transfer_std_vs_truth_px": 1.9602180012020263
+    },
+    {
+      "sigma_px": 3.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.49626077201422,
+      "transfer_median_vs_truth_px": 95.7363073192429,
+      "transfer_std_vs_truth_px": 1.9602180015147745
+    },
+    {
+      "sigma_px": 3.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 2.8976465588311373,
+      "transfer_median_vs_truth_px": 2.7774332543084364,
+      "transfer_std_vs_truth_px": 1.0281277090863592
+    },
+    {
+      "sigma_px": 3.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 2.8976465589477227,
+      "transfer_median_vs_truth_px": 2.7774332550718945,
+      "transfer_std_vs_truth_px": 1.02812770912383
+    },
+    {
+      "sigma_px": 5.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.65388060263173,
+      "transfer_median_vs_truth_px": 96.07112495623761,
+      "transfer_std_vs_truth_px": 3.271616299121267
+    },
+    {
+      "sigma_px": 5.0,
+      "case": "auto_estimated",
+      "target_size": "751x535",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 95.6538806033541,
+      "transfer_median_vs_truth_px": 96.07112495800828,
+      "transfer_std_vs_truth_px": 3.2716162993388753
+    },
+    {
+      "sigma_px": 5.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "basic_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 4.833269805336395,
+      "transfer_median_vs_truth_px": 4.618506542128902,
+      "transfer_std_vs_truth_px": 1.7166268246340406
+    },
+    {
+      "sigma_px": 5.0,
+      "case": "true_size",
+      "target_size": "640x420",
+      "method": "normalized_dlt",
+      "repeats": 100,
+      "transfer_mae_vs_truth_px": 4.833269805335532,
+      "transfer_median_vs_truth_px": 4.6185065418024305,
+      "transfer_std_vs_truth_px": 1.7166268246463359
+    }
+  ]
+}

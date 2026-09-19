@@ -2,7 +2,7 @@
 
 本目录存放用于射影矫正实验的公开数据样例。所有图片均为公开来源，逐张记录来源、作者与授权，供作业引用与答辩说明使用。
 
-**重要：本目录下的图片被 `.gitignore` 排除**（`data/public/*`），不会进入版本库。换电脑后请用项目根目录的 `fetch_public_samples.py` 重新拉取，或手动复制本目录。
+注意：本目录下的图片被 `.gitignore` 排除（`data/public/*`），不会进入版本库。换电脑后请用项目根目录的 `fetch_public_samples.py` 重新拉取，或手动复制本目录。
 
 ---
 
@@ -28,7 +28,7 @@
 
 | 文件 | 内容 | 为什么选它 | 文件页 |
 |---|---|---|---|
-| `chessboard.jpg` | 草地上的白桌，桌面棋盘 | 规则网格纹理，矫正是否正确一眼可判；网格是最强的可视化判据 | [File:Chessboard 2.jpg](https://commons.wikimedia.org/wiki/File:Chessboard_2.jpg) |
+| `chessboard.jpg` | 草地上的白桌，桌面棋盘 | 规则网格纹理，矫正是否正确容易判断；网格是最强的可视化判据 | [File:Chessboard 2.jpg](https://commons.wikimedia.org/wiki/File:Chessboard_2.jpg) |
 | `book_cover.jpg` | 一本化学教材的封面 | CC0 授权最宽松；书脊与封面构成明确的平面矩形 | [File:Book-cover.jpg](https://commons.wikimedia.org/wiki/File:Book-cover.jpg) |
 | `flipchart_venn.jpg` | 翻页板上的 Venn 图 | 高对比线条 + 手写文字，可检验文字是否被拉直 | [File:Flipchart Motivation03.jpg](https://commons.wikimedia.org/wiki/File:Flipchart_Motivation03.jpg) |
 | `flipchart_table.jpg` | 翻页板上的 "To do - Liste" 表格 | 表格横线可直接观察是否保持水平 | [File:Flipchart ToDo-Liste.jpg](https://commons.wikimedia.org/wiki/File:Flipchart_ToDo-Liste.jpg) |
@@ -52,30 +52,37 @@ DocUNet 的原始数据里还有平板扫描仪扫描的**无畸变真值**（`s
 > *DocUNet: Document Image Unwarping via A Stacked U-Net.*
 > Proceedings of IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2018.
 
-## 三、角点种子值
+## 三、角点文件
 
-`corners/` 子目录存放 5 张图片的**种子角点**（JSON 数组，顺序为 TL, TR, BR, BL），均由自动检测生成并**逐张渲染验证过**：
+`corners/` 子目录存放 9 张图片的**角点**（JSON 数组，顺序为 TL, TR, BR, BL）。全部为自动检测 + 边缘吸附生成，并**逐张渲染正视图目视验证**：
 
-| 种子文件 | 状态 |
-|---|---|
-| `chessboard.json` | ✅ 已验证，四边形准确套住棋盘 |
-| `docunet_29_view1.json` | ✅ 已验证，准确套住纸张 |
-| `docunet_29_view2.json` | ✅ 已验证 |
-| `docunet_30_view1.json` | ✅ 已验证 |
-| `docunet_30_view2.json` | ✅ 已验证 |
+| 种子文件 | 生成方式 | 状态 |
+|---|---|---|
+| `chessboard.json` | 轮廓四边形 | 四边形准确套住棋盘桌面 |
+| `docunet_29_view1.json` | 轮廓四边形 | 准确套住纸张，文字矫正后水平 |
+| `docunet_29_view2.json` | 轮廓四边形 | 同上 |
+| `docunet_30_view1.json` | 轮廓四边形 | 同上 |
+| `docunet_30_view2.json` | 轮廓四边形 | 同上 |
+| `menu_board.json` | 暗区分割 + 梯度边缘吸附 | 准确套住黑板面板（这块黑板是唯一的真斜拍户外样本） |
+| `book_cover.json` | 轮廓四边形 | 取封面矩形（书脊为左边界） |
+| `flipchart_venn.json` | 取可见区域四角 | 满帧样本 |
+| `flipchart_table.json` | 取可见区域四角 | 满帧样本 |
 
-以下 4 张**没有**种子角点，需要在 `run.py` 窗口里手动点选：
+> 这两张翻页板照片**填满整个画幅、页边不在画面内**，因此不存在可检测的四边形边界，只能取可见区域的四角。它们不是斜拍样本，而是**近正视对照样本**：对接近正视的输入做矫正，输出应当几乎不变。这本身是一个有价值的对照——它可以检验矫正流程不会凭空引入形变。
 
-| 文件 | 原因 |
-|---|---|
-| `menu_board.jpg` | 黑板与深色背景对比不足，自动检测失败；需手动点选 |
-| `book_cover.jpg` | 书本几乎占满画面，透视量很小 |
-| `flipchart_venn.jpg` | 翻页板几乎占满画面，接近正视 |
-| `flipchart_table.jpg` | 同上 |
+**新增图片时的流程**：用 `point_picker.py` 在窗口里点选一次，角点会自动存到 `corners/<图片名>.json`：
 
-后三张虽然不适合作为"斜拍矫正"的主样本，但可以作为**近正视对照样本**使用：对接近正视的输入做矫正，输出应该几乎不变。这本身是一个有价值的对照（可以检验矫正流程不会凭空引入形变）。
+```powershell
+python point_picker.py --input data/public/my_photo.jpg
+```
 
-种子角点的用法（单张、非交互）：
+**角点的用法**：批处理会自动查找并复用，完全不需要窗口：
+
+```powershell
+python run.py --input-dir data --batch --no-interactive --output-dir outputs
+```
+
+单张非交互运行也可以显式指定：
 
 ```powershell
 python run.py --input data/public/chessboard.jpg `
@@ -83,15 +90,17 @@ python run.py --input data/public/chessboard.jpg `
               --output-dir outputs
 ```
 
-> 批处理模式 `--input-dir` 目前不支持逐张指定角点文件（`--points-file` 仅对 `--input` 生效），因此这几张样例目前只能逐张跑，或在窗口里逐张点选。这一限制已记录在 `优化计划书.md` 的 C5 条目中。
+> 早先的限制（`--points-file` 仅对 `--input` 生效、批处理必须逐张手动点选）已经修复：`run.py` 的批处理模式会按 `<图片目录>/corners/<图片名>.json` 自动查找角点，并支持 `--no-interactive` 彻底禁止弹窗。
 
 ## 四、数据量与用途分配
 
 | 来源 | 张数 | 报告中的位置 |
 |---|---|---|
 | `data/sample/sample_slanted.png` | 1（程序生成，含精确真值） | 合成数据、真值闭环实验 |
-| `data/public/`（本目录） | 9 | 报告 §8.2 / §11.2 "public" 行 |
-| `data/phone/` | 待补充（自行拍摄） | 报告 §8.2 / §11.2 "phone" 行 |
+| `data/public/`（本目录） | 9（全部已有角点） | 报告 §8.2 / §11.2 "public" 行 |
+| `data/phone/` | 4（自行拍摄，全部已有角点） | 报告 §8.2 / §11.2 "phone" 行 |
+
+两批真实图片合计 13 张，全部经 `python run.py --input-dir data --batch --no-interactive` 跑通。
 
 共 5.4 MB，不构成版本库负担；但因 `.gitignore` 规则不会提交，换机需重新拉取。
 
@@ -104,3 +113,20 @@ python fetch_public_samples.py
 # 同时拉取 DocUNet 部分（会下载 344 MB 压缩包，之后只解压需要的 4 张）
 python fetch_public_samples.py --with-docunet
 ```
+
+---
+
+## 六、自拍照片（`data/phone/`）
+
+作业原文允许"选择开放数据集**或者**自行拍摄"，本项目两条都做了。自拍部分共 4 张，与公开数据集样本形成对照：
+
+| 文件 | 分辨率 | 内容 | 拍摄条件 |
+|---|---|---|---|
+| `fig1.jpg` | 1280×1700 | 卡片（ZHAOLUSI） | 木桌平放俯拍，斜视角较小 |
+| `fig2.jpg` | 1700×1280 | 卡片（ZHAOLUSI） | 同场景横构图，斜视角较大 |
+| `fig3.jpg` | 1700×1280 | 创口贴包装（WOUND PLASTER） | 木桌平放，明显斜拍 |
+| `fig4.jpg` | 1700×1280 | 创口贴包装（WOUND PLASTER） | 同场景，反向旋转 |
+
+角点见 `data/phone/corners/*.json`。这些照片**不进版本库**（自行拍摄，体积大），但角点 JSON 会提交——把照片放回 `data/phone/` 即可无交互重跑批处理。
+
+自拍样本的价值在于它与公开数据集样本的差异：桌面上没有任何已知尺寸的参照物，输出尺寸只能靠"对边平均长度"估计，因此**宽高比的先验是最不可靠的**——正好从反面印证了报告 §3.6 的结论（目标矩形是最大误差源）。
